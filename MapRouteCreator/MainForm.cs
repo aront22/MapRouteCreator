@@ -29,9 +29,23 @@ namespace MapRouteCreator
             public int Y { get; private set; }
             public int Id { get; private set; }
             public Dictionary<NodeButton, double> ConnectedNodes { get; private set; } = new Dictionary<NodeButton, double>();
-            public NodeButton(int x, int y)
+
+            public NodeButton(Random rnd, int xMin, int xMax, int yMin, int yMax)
             {
                 Id = IdCounter++;
+                X = rnd.Next(xMin, xMax); 
+                Y = rnd.Next(yMin, yMax);
+                Left = X;
+                Top = Y;
+                Width = 30;
+                Height = 30;
+                Margin = new Padding(0);
+                Padding = new Padding(0);
+                Font = new Font("Arial", 8.0f);
+            }
+
+            public NodeButton(int x, int y)
+            {
                 X = x;
                 Y = y;
                 Left = X;
@@ -41,11 +55,16 @@ namespace MapRouteCreator
                 Margin = new Padding(0);
                 Padding = new Padding(0);
                 Font = new Font("Arial", 8.0f);
-                
+                Add();
+            }
+
+            public void Add()
+            {
+                Id = IdCounter++;
                 Text = $"{Id}";
                 Nodes.Add(this);
-
             }
+
             public bool AddConnection(NodeButton node, double dist)
             {
                 try
@@ -184,6 +203,47 @@ namespace MapRouteCreator
                 {
                     Clear();
                     return false;
+                }
+            }
+
+            internal static void Randomize(int n, int l, MainForm mainForm)
+            {
+                Clear();
+                int xMin = 30;
+                int xMax = mainForm.Width - 2 * xMin;
+                int yMin = 30;
+                int yMax = mainForm.Height - 2 * yMin;
+                int minDist = 40;
+                for (int i = 0; i < n;)
+                {
+                    NodeButton newNode = new NodeButton(mainForm.rnd, xMin, xMax, yMin, yMax);
+                    if (Nodes.Any((node) => Math.Abs(node.X - newNode.X) < minDist && Math.Abs(node.Y - newNode.Y) < minDist))
+                        continue;
+                    else
+                    {
+                        newNode.Add();
+                        mainForm.Controls.Add(newNode);
+                        newNode.MouseDown += mainForm.Clicked;
+                        i++;
+                    }
+                }
+
+                for (int i = 0; i < l; )
+                {
+                    Tuple<NodeButton, NodeButton> newPair = 
+                        new Tuple<NodeButton, NodeButton>(
+                            Nodes[mainForm.rnd.Next(0, Nodes.Count)], 
+                            Nodes[mainForm.rnd.Next(0, Nodes.Count)]);
+
+                    if (newPair.Item1 == newPair.Item2)
+                        continue;
+
+                    if (Routes.Any((p) => (p.Item1 == newPair.Item1 && p.Item2 == newPair.Item2) ||
+                                             (p.Item1 == newPair.Item2 && p.Item2 == newPair.Item1)))
+                        continue;
+
+                    ConnectNodes(newPair.Item1, newPair.Item2);
+                    i++;
                 }
             }
         }
@@ -325,7 +385,7 @@ namespace MapRouteCreator
                 }
                 if (!NodeButton.Import(ofd.FileName, this))
                 {
-                    MessageBox.Show("Failed to import! ", "Inport Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Failed to import! ", "Import Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 Invalidate();
             }
@@ -338,6 +398,23 @@ namespace MapRouteCreator
             {
                 File.WriteAllText(sfd.FileName, NodeButton.Export());
             }
+        }
+
+        private void btnRandom_Click(object sender, EventArgs e)
+        {
+            int n, l;
+            if(!(int.TryParse(txbNodes.Text, out n) && int.TryParse(txbLines.Text, out l)))
+            {
+                MessageBox.Show("Only numbers are accepted!", "Invalid Arguments!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            foreach (var node in NodeButton.Nodes)
+            {
+                Controls.Remove(node);
+            }
+            NodeButton.Randomize(n, l, this);
+            Invalidate();
         }
     }
 }
