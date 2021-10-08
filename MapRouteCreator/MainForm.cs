@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Linq;
+using System.IO;
 
 namespace MapRouteCreator
 {
@@ -130,6 +130,62 @@ namespace MapRouteCreator
 
                 return str;
             }
+
+            internal static bool Import(string inputFile, MainForm f)
+            {
+                Clear();
+                List<Tuple<int, int>> pathToFind = new List<Tuple<int, int>>();
+
+                try
+                {
+                    using (StreamReader sr = new StreamReader(inputFile))
+                    {
+                        for (int i = 0; i < 3; i++)
+                            sr.ReadLine();
+
+                        sr.ReadLine();
+                        string line;
+
+                        while ((line = sr.ReadLine()) != "")
+                        {
+                            var split = line.Split('\t');
+                            pathToFind.Add(new Tuple<int, int>(Convert.ToInt32(split[0]), Convert.ToInt32(split[1])));
+                        }
+
+                        while ((line = sr.ReadLine()) != "")
+                        {
+                            var split = line.Split('\t');
+                            NodeButton n = new NodeButton(Convert.ToInt32(split[0]) - 15, Convert.ToInt32(split[1]) - 15);
+                            n.MouseDown += f.Clicked;
+                            f.Controls.Add(n);
+                        }
+
+                        while ((line = sr.ReadLine()) != null)
+                        {
+                            var split = line.Split('\t');
+                            ConnectNodes(Nodes.Find((n) => n.Id == Convert.ToInt32(split[0])), Nodes.Find((n) => n.Id == Convert.ToInt32(split[1])));
+                        }
+
+                        foreach (var path in pathToFind)
+                        {
+                            NodeButton n1 = Nodes.Find((n) => n.Id == path.Item1);
+                            NodeButton n2 = Nodes.Find((n) => n.Id == path.Item2);
+
+                            Color c = f.GetRandomColor();
+                            n1.BackColor = c;
+                            n2.BackColor = c;
+
+                            RoutesToFind.Add(new Tuple<NodeButton, NodeButton>(n1, n2));
+                        }
+                    }
+                    return true;
+                }
+                catch (Exception)
+                {
+                    Clear();
+                    return false;
+                }
+            }
         }
 
         public Random rnd { get; set; } = new Random();
@@ -146,7 +202,7 @@ namespace MapRouteCreator
             this.Controls.Add(n);
         }
 
-        private Color GetRandomColor()
+        public Color GetRandomColor()
         {
             return Color.FromArgb(rnd.Next(100, 255), rnd.Next(100, 255), rnd.Next(100, 255));
         }
@@ -223,15 +279,6 @@ namespace MapRouteCreator
             }
         }
 
-        private void exportToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            string str = NodeButton.Export();
-            if (str != null)
-                Clipboard.SetText(str);
-
-            MessageBox.Show(str, "Copied to Clipboard!", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
         private void resetToolStripMenuItem_Click(object sender, EventArgs e)
         {
             foreach (var n in NodeButton.Nodes)
@@ -256,6 +303,41 @@ namespace MapRouteCreator
             }
             hideDistance = !hideDistance;
             Invalidate();
+        }
+
+        private void exportToolStripMenuItem_Click_1(object sender, EventArgs e)
+        {
+            string str = NodeButton.Export();
+            if (str != null)
+                Clipboard.SetText(str);
+
+            MessageBox.Show(str, "Copied to Clipboard!", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void importToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            if (ofd.ShowDialog(this) == DialogResult.OK)
+            {
+                foreach (var n in NodeButton.Nodes)
+                {
+                    Controls.Remove(n);
+                }
+                if (!NodeButton.Import(ofd.FileName, this))
+                {
+                    MessageBox.Show("Failed to import! ", "Inport Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                Invalidate();
+            }
+        }
+
+        private void exportToFileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            SaveFileDialog sfd = new SaveFileDialog();
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                File.WriteAllText(sfd.FileName, NodeButton.Export());
+            }
         }
     }
 }
